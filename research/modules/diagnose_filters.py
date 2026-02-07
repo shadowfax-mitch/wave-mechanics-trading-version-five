@@ -57,22 +57,23 @@ def main():
     print(f"  Bullish wave bars: {bullish_wave_bars:,}")
     print(f"  Bearish wave bars: {bearish_wave_bars:,}")
     
-    # Z-score + R1 + Wave
-    long_z_r1_wave = ((signals['zscore'] <= -strategy.params['z_threshold']) & 
-                      signals['is_R1'] & 
-                      signals['bullish_wave']).sum()
-    short_z_r1_wave = ((signals['zscore'] >= strategy.params['z_threshold']) & 
-                       signals['is_R1'] & 
-                       signals['bearish_wave']).sum()
+    # Z-score + R1 + Wave (inverted: bearish wave for longs, bullish wave for shorts)
+    long_z_r1_wave = ((signals['zscore'] <= -strategy.params['z_threshold']) &
+                      signals['is_R1'] &
+                      signals['bearish_wave']).sum()
+    short_z_r1_wave = ((signals['zscore'] >= strategy.params['z_threshold']) &
+                       signals['is_R1'] &
+                       signals['bullish_wave']).sum()
     print(f"\n5️⃣  Z-SCORE + R1 + WAVE COMBINED")
     print(f"  Long signals (Z + R1 + Wave): {long_z_r1_wave}")
     print(f"  Short signals (Z + R1 + Wave): {short_z_r1_wave}")
     print(f"  Total: {long_z_r1_wave + short_z_r1_wave}")
     
     # Swing proximity
-    near_swing_low = (signals['bars_since_swing_low'] <= 2).sum()
-    near_swing_high = (signals['bars_since_swing_high'] <= 2).sum()
-    print(f"\n6️⃣  SWING PROXIMITY FILTER (within 2 bars)")
+    proximity = strategy.params['swing_proximity']
+    near_swing_low = (signals['bars_since_swing_low'] <= proximity).sum()
+    near_swing_high = (signals['bars_since_swing_high'] <= proximity).sum()
+    print(f"\n6️⃣  SWING PROXIMITY FILTER (within {proximity} bars)")
     print(f"  Bars near swing low: {near_swing_low:,}")
     print(f"  Bars near swing high: {near_swing_high:,}")
     

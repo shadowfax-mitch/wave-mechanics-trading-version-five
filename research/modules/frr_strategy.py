@@ -23,22 +23,23 @@ class FRRStrategy:
         Args:
             params: Dictionary of strategy parameters
         """
-        # Default parameters (AGGRESSIVE OVERTRADE MODE - tune for frequency first)
+        # Default parameters (V5 SPEC values)
         self.params = {
             'swing_strength': 2,
             'regime_window': 20,
-            'amp_threshold': 0.6,      # AGGRESSIVE: way more R1 bars
-            'chop_threshold': 0.3,     # AGGRESSIVE: way more R1 bars
+            'amp_threshold': 1.5,      # V5 SPEC: 1.5x ATR amplitude
+            'chop_threshold': 0.6,     # V5 SPEC: 60%+ choppiness
             'energy_threshold': 50,    # percentile
             'ema_period': 50,
-            'z_threshold': 3.0,        # AGGRESSIVE: many more Z-extremes
+            'z_threshold': 3.5,        # Validated: best edge at prox=2
             'atr_period': 14,
             'stop_atr_mult': 1.0,
             'max_hold_bars': 20,
-            'swing_proximity': 10,     # AGGRESSIVE: very flexible entry timing
+            'swing_proximity': 2,      # V5 SPEC: within 2 bars of swing
             'daily_loss_limit': -200,
             'max_consecutive_losses': 3,
-            'use_wave_filter': True,   # Re-enabled (it creates edge)
+            'use_wave_filter': True,
+            'use_regime_filter': False,  # R1 fires 0.06% of bars — disabled
         }
         
         if params:
@@ -166,7 +167,7 @@ class FRRStrategy:
         
         return is_R1
     
-    def calculate_zscore(self, df: pd.DataFrame, period: int) -> pd.Series:
+    def calculate_zscore(self, df: pd.DataFrame, period: int) -> Tuple[pd.Series, pd.Series]:
         """
         Calculate Z-score: (Close - EMA) / StdDev
         """
@@ -235,10 +236,15 @@ class FRRStrategy:
         """Calculate bars since last swing point (VECTORIZED)"""
         # Create cumulative counter that resets at each swing
         swing_indices = swing_series.astype(int).cumsum()
-        
+
         # Group by swing index and count bars within each group
         bars_since = swing_series.groupby(swing_indices).cumcount()
-        
+
+        # Bars before the first swing have no valid reference point —
+        # set to large value so they don't falsely trigger proximity checks
+        if swing_series.any():
+            bars_since[swing_indices == 0] = len(df)
+
         return bars_since
     
     def generate_signals(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -282,37 +288,32 @@ class FRRStrategy:
         signals['last_swing_high'] = swing_high_values.ffill()
         signals['last_swing_low'] = swing_low_values.ffill()
         
-        # Entry signals - Wave filter conditionally applied
-        if self.params.get('use_wave_filter', True):
-            # INVERTED wave logic for mean reversion
-            # LONG when oversold in BEARISH wave (catch bottom in downtrend)
-            # SHORT when overbought in BULLISH wave (catch top in uptrend)
-            signals['long_entry'] = (
-                signals['is_R1'] &
-                (signals['zscore'] <= -self.params['z_threshold']) &
-                signals['bearish_wave'] &
-                (signals['bars_since_swing_low'] <= self.params['swing_proximity'])
-            )
-            
-            signals['short_entry'] = (
-                signals['is_R1'] &
-                (signals['zscore'] >= self.params['z_threshold']) &
-                signals['bullish_wave'] &
-                (signals['bars_since_swing_high'] <= self.params['swing_proximity'])
-            )
+        # Entry signals - build filter chain based on config
+        use_wave = self.params.get('use_wave_filter', True)
+        use_regime = self.params.get('use_regime_filter', True)
+
+        # Base condition: Z-score extreme + swing proximity
+        long_base = (
+            (signals['zscore'] <= -self.params['z_threshold']) &
+            (signals['bars_since_swing_low'] <= self.params['swing_proximity'])
+        )
+        short_base = (
+            (signals['zscore'] >= self.params['z_threshold']) &
+            (signals['bars_since_swing_high'] <= self.params['swing_proximity'])
+        )
+
+        # Optional: R1 regime filter
+        if use_regime:
+            long_base = long_base & signals['is_R1']
+            short_base = short_base & signals['is_R1']
+
+        # Optional: Wave direction filter (inverted for mean reversion)
+        if use_wave:
+            signals['long_entry'] = long_base & signals['bearish_wave']
+            signals['short_entry'] = short_base & signals['bullish_wave']
         else:
-            # NO wave filter - just Z + R1 + swing proximity
-            signals['long_entry'] = (
-                signals['is_R1'] &
-                (signals['zscore'] <= -self.params['z_threshold']) &
-                (signals['bars_since_swing_low'] <= self.params['swing_proximity'])
-            )
-            
-            signals['short_entry'] = (
-                signals['is_R1'] &
-                (signals['zscore'] >= self.params['z_threshold']) &
-                (signals['bars_since_swing_high'] <= self.params['swing_proximity'])
-            )
+            signals['long_entry'] = long_base
+            signals['short_entry'] = short_base
         
         return signals
     
@@ -352,18 +353,12 @@ class FRRStrategy:
                 self.daily_pnl = 0  # Reset for new day
                 self.consecutive_losses = 0  # Reset for new day
             
-            # Circuit breaker check
-            if self.daily_pnl <= self.params['daily_loss_limit']:
-                continue
-            if self.consecutive_losses >= self.params['max_consecutive_losses']:
-                continue
-            
-            # Exit logic (if in position)
+            # Exit logic (if in position) — always runs, even during circuit breaker
             if self.in_position:
                 bars_held = i - self.entry_bar
                 exit_signal = None
                 exit_price = None
-                
+
                 # Profit target: EMA reversion
                 if self.position_type == 'LONG' and current_bar['close'] >= current_bar['ema']:
                     exit_signal = 'TARGET'
@@ -371,34 +366,34 @@ class FRRStrategy:
                 elif self.position_type == 'SHORT' and current_bar['close'] <= current_bar['ema']:
                     exit_signal = 'TARGET'
                     exit_price = current_bar['ema']
-                
-                # Stop loss
+
+                # Stop loss (use close for conservative fill estimate)
                 elif self.position_type == 'LONG':
                     stop_level = current_bar['last_swing_low'] - (
                         self.params['stop_atr_mult'] * current_bar['atr']
                     )
                     if current_bar['close'] <= stop_level:
                         exit_signal = 'STOP'
-                        exit_price = stop_level
-                
+                        exit_price = current_bar['close']
+
                 elif self.position_type == 'SHORT':
                     stop_level = current_bar['last_swing_high'] + (
                         self.params['stop_atr_mult'] * current_bar['atr']
                     )
                     if current_bar['close'] >= stop_level:
                         exit_signal = 'STOP'
-                        exit_price = stop_level
-                
+                        exit_price = current_bar['close']
+
                 # Time-based exit
                 if exit_signal is None and bars_held >= self.params['max_hold_bars']:
                     exit_signal = 'TIME'
                     exit_price = current_bar['close']
-                
+
                 # Regime exit
                 if exit_signal is None and not current_bar['is_R1']:
                     exit_signal = 'REGIME'
                     exit_price = current_bar['close']
-                
+
                 # Execute exit
                 if exit_signal:
                     self._exit_trade(
@@ -409,9 +404,15 @@ class FRRStrategy:
                         slippage=slippage,
                         commission=commission
                     )
-            
+
+            # Circuit breaker check (only gates new entries)
+            if self.daily_pnl <= self.params['daily_loss_limit']:
+                continue
+            if self.consecutive_losses >= self.params['max_consecutive_losses']:
+                continue
+
             # Entry logic (if not in position)
-            else:
+            if not self.in_position:
                 # LONG entry
                 if bool(prev_bar['long_entry']):  # Explicit bool() cast
                     self._enter_trade(
@@ -421,7 +422,7 @@ class FRRStrategy:
                         entry_price=current_bar['open'],  # Market order at open
                         slippage=slippage
                     )
-                
+
                 # SHORT entry
                 elif bool(prev_bar['short_entry']):  # Explicit bool() cast
                     self._enter_trade(
@@ -544,7 +545,7 @@ class FRRStrategy:
         
         gross_profit = winners['pnl'].sum() if len(winners) > 0 else 0
         gross_loss = abs(losers['pnl'].sum()) if len(losers) > 0 else 0
-        profit_factor = gross_profit / gross_loss if gross_loss > 0 else 0
+        profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
         
         total_pnl = trades_df['pnl'].sum()
         avg_win = winners['pnl'].mean() if len(winners) > 0 else 0
@@ -556,9 +557,15 @@ class FRRStrategy:
         drawdown = running_max - cumulative_pnl
         max_drawdown = drawdown.max()
         
-        # Sharpe (simplified: returns / std)
+        # Sharpe ratio (annualized, based on daily P&L)
         if len(trades_df) > 1:
-            sharpe_ratio = trades_df['pnl'].mean() / trades_df['pnl'].std()
+            daily_pnl = trades_df.groupby(
+                pd.to_datetime(trades_df['entry_time']).dt.date
+            )['pnl'].sum()
+            if len(daily_pnl) > 1 and daily_pnl.std() > 0:
+                sharpe_ratio = (daily_pnl.mean() / daily_pnl.std()) * np.sqrt(252)
+            else:
+                sharpe_ratio = 0
         else:
             sharpe_ratio = 0
         

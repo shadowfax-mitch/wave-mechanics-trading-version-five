@@ -51,11 +51,12 @@ def main():
         current_bar = signals.iloc[i]
         prev_bar = signals.iloc[i - 1]
         
-        # Reset daily P&L
+        # Reset daily P&L and consecutive losses
         bar_date = current_bar.name.date()
         if current_date != bar_date:
             current_date = bar_date
             daily_pnl = 0
+            consecutive_losses = 0
         
         # Check for entry signal
         has_long_signal = prev_bar['long_entry']

@@ -74,7 +74,7 @@ def calculate_std(values, period):
     for i in range(period - 1, len(values)):
         window = values[i - period + 1:i + 1]
         mean = sum(window) / len(window)
-        variance = sum((x - mean) ** 2 for x in window) / len(window)
+        variance = sum((x - mean) ** 2 for x in window) / (len(window) - 1)
         std[i] = variance ** 0.5
     
     return std
@@ -204,11 +204,11 @@ def main():
     params = {
         'swing_strength': 2,
         'regime_window': 20,
-        'amp_threshold': 1.5,
-        'chop_threshold': 0.6,
+        'amp_threshold': 0.6,
+        'chop_threshold': 0.3,
         'energy_threshold': 50,
         'ema_period': 50,
-        'z_threshold': 5.0,
+        'z_threshold': 3.0,
         'atr_period': 14,
         'stop_atr_mult': 1.0,
         'max_hold_bars': 20,
