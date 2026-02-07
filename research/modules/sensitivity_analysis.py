@@ -96,13 +96,11 @@ def run_full_sensitivity_analysis(df: pd.DataFrame) -> dict:
     Returns:
         Dictionary with results for each parameter
     """
-    # Baseline parameters (from current FRR strategy)
+    # Baseline parameters (locked-in: Z=3.5, prox=2, no R1)
     baseline_params = {
-        'z_threshold': 3.0,
+        'z_threshold': 3.5,
         'swing_lookback': 2,
-        'swing_proximity': 10,
-        'amp_threshold': 0.6,
-        'chop_threshold': 0.3,
+        'swing_proximity': 2,
         'ema_period': 50,
         'atr_period': 14,
         'stop_atr_mult': 1.0,
