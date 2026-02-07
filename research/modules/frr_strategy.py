@@ -23,20 +23,22 @@ class FRRStrategy:
         Args:
             params: Dictionary of strategy parameters
         """
-        # Default parameters (from V5_STRATEGY_SPEC.md)
+        # Default parameters (AGGRESSIVE OVERTRADE MODE - tune for frequency first)
         self.params = {
             'swing_strength': 2,
             'regime_window': 20,
-            'amp_threshold': 1.5,
-            'chop_threshold': 0.6,
-            'energy_threshold': 50,  # percentile
+            'amp_threshold': 0.6,      # AGGRESSIVE: way more R1 bars
+            'chop_threshold': 0.3,     # AGGRESSIVE: way more R1 bars
+            'energy_threshold': 50,    # percentile
             'ema_period': 50,
-            'z_threshold': 5.0,
+            'z_threshold': 3.0,        # AGGRESSIVE: many more Z-extremes
             'atr_period': 14,
             'stop_atr_mult': 1.0,
             'max_hold_bars': 20,
+            'swing_proximity': 10,     # AGGRESSIVE: very flexible entry timing
             'daily_loss_limit': -200,
             'max_consecutive_losses': 3,
+            'use_wave_filter': True,   # Re-enabled (it creates edge)
         }
         
         if params:
@@ -58,7 +60,7 @@ class FRRStrategy:
     
     def detect_swing_highs(self, df: pd.DataFrame, strength: int = 2) -> pd.Series:
         """
-        Detect swing high fractal points
+        Detect swing high fractal points (VECTORIZED)
         
         Args:
             df: DataFrame with OHLCV data
@@ -67,22 +69,27 @@ class FRRStrategy:
         Returns:
             Boolean series indicating swing highs
         """
-        highs = df['high'].values
-        swing_highs = pd.Series(False, index=df.index)
+        highs = df['high']
         
-        for i in range(strength, len(highs) - strength):
-            is_swing = True
-            for j in range(1, strength + 1):
-                if highs[i] <= highs[i - j] or highs[i] <= highs[i + j]:
-                    is_swing = False
-                    break
-            swing_highs.iloc[i] = is_swing
+        # Initialize as True, then eliminate non-swings
+        is_swing = pd.Series(True, index=df.index)
         
-        return swing_highs
+        # Check all bars on left and right sides
+        for i in range(1, strength + 1):
+            # Current high must be > all prior bars in range
+            is_swing &= highs > highs.shift(i)
+            # Current high must be > all future bars in range
+            is_swing &= highs > highs.shift(-i)
+        
+        # First and last 'strength' bars cannot be swings
+        is_swing.iloc[:strength] = False
+        is_swing.iloc[-strength:] = False
+        
+        return is_swing
     
     def detect_swing_lows(self, df: pd.DataFrame, strength: int = 2) -> pd.Series:
         """
-        Detect swing low fractal points
+        Detect swing low fractal points (VECTORIZED)
         
         Args:
             df: DataFrame with OHLCV data
@@ -91,18 +98,23 @@ class FRRStrategy:
         Returns:
             Boolean series indicating swing lows
         """
-        lows = df['low'].values
-        swing_lows = pd.Series(False, index=df.index)
+        lows = df['low']
         
-        for i in range(strength, len(lows) - strength):
-            is_swing = True
-            for j in range(1, strength + 1):
-                if lows[i] >= lows[i - j] or lows[i] >= lows[i + j]:
-                    is_swing = False
-                    break
-            swing_lows.iloc[i] = is_swing
+        # Initialize as True, then eliminate non-swings
+        is_swing = pd.Series(True, index=df.index)
         
-        return swing_lows
+        # Check all bars on left and right sides
+        for i in range(1, strength + 1):
+            # Current low must be < all prior bars in range
+            is_swing &= lows < lows.shift(i)
+            # Current low must be < all future bars in range
+            is_swing &= lows < lows.shift(-i)
+        
+        # First and last 'strength' bars cannot be swings
+        is_swing.iloc[:strength] = False
+        is_swing.iloc[-strength:] = False
+        
+        return is_swing
     
     def calculate_atr(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
         """Calculate Average True Range"""
@@ -167,44 +179,65 @@ class FRRStrategy:
     
     def calculate_wave_direction(self, df: pd.DataFrame) -> Tuple[pd.Series, pd.Series]:
         """
-        Calculate wave direction from swing points
+        Calculate wave direction from swing points (PROPERLY FIXED)
+        
+        Wave direction is determined by comparing consecutive swing points:
+        - Bullish wave: When a new swing low is HIGHER than the previous swing low
+        - Bearish wave: When a new swing high is LOWER than the previous swing high
+        
+        Direction is forward-filled until a new swing point changes it.
         
         Returns:
-            bullish_wave: Boolean series (higher swing lows)
-            bearish_wave: Boolean series (lower swing highs)
+            bullish_wave: Boolean series (higher swing lows trend)
+            bearish_wave: Boolean series (lower swing highs trend)
         """
         swing_highs = self.detect_swing_highs(df, self.params['swing_strength'])
         swing_lows = self.detect_swing_lows(df, self.params['swing_strength'])
         
-        # Get swing high/low values
+        # Get just the swing point values (NaN elsewhere)
         swing_high_values = df['high'].where(swing_highs)
         swing_low_values = df['low'].where(swing_lows)
         
-        # Forward fill to get most recent swing levels
-        last_swing_high = swing_high_values.fillna(method='ffill')
-        last_swing_low = swing_low_values.fillna(method='ffill')
+        # Identify when swing levels CHANGE (new swing point detected)
+        # Compare each swing to the previous swing
+        bullish_wave = pd.Series(False, index=df.index)
+        bearish_wave = pd.Series(False, index=df.index)
         
-        # Compare current vs prior swing
-        prev_swing_high = last_swing_high.shift(1)
-        prev_swing_low = last_swing_low.shift(1)
+        last_swing_low = None
+        last_swing_high = None
+        current_bullish = False
+        current_bearish = False
         
-        # Bullish: higher lows, Bearish: lower highs
-        bullish_wave = last_swing_low > prev_swing_low
-        bearish_wave = last_swing_high < prev_swing_high
+        for i in range(len(df)):
+            # Check for new swing low
+            if not pd.isna(swing_low_values.iloc[i]):
+                new_low = swing_low_values.iloc[i]
+                if last_swing_low is not None:
+                    # Compare to previous swing low
+                    current_bullish = new_low > last_swing_low
+                last_swing_low = new_low
+            
+            # Check for new swing high
+            if not pd.isna(swing_high_values.iloc[i]):
+                new_high = swing_high_values.iloc[i]
+                if last_swing_high is not None:
+                    # Compare to previous swing high
+                    current_bearish = new_high < last_swing_high
+                last_swing_high = new_high
+            
+            # Set current wave direction (carries forward until next swing)
+            bullish_wave.iloc[i] = current_bullish
+            bearish_wave.iloc[i] = current_bearish
         
         return bullish_wave, bearish_wave
     
     def bars_since_swing(self, df: pd.DataFrame, swing_series: pd.Series) -> pd.Series:
-        """Calculate bars since last swing point"""
-        bars_since = pd.Series(999, index=df.index)  # Large number
+        """Calculate bars since last swing point (VECTORIZED)"""
+        # Create cumulative counter that resets at each swing
+        swing_indices = swing_series.astype(int).cumsum()
         
-        swing_indices = df.index[swing_series].tolist()
-        
-        for i, idx in enumerate(df.index):
-            for swing_idx in reversed(swing_indices):
-                if swing_idx <= idx:
-                    bars_since.loc[idx] = df.index.get_loc(idx) - df.index.get_loc(swing_idx)
-                    break
+        # Group by swing index and count bars within each group
+        bars_since = swing_series.groupby(swing_indices).cumcount()
         
         return bars_since
     
@@ -246,23 +279,40 @@ class FRRStrategy:
         swing_high_values = signals['high'].where(signals['swing_high'])
         swing_low_values = signals['low'].where(signals['swing_low'])
         
-        signals['last_swing_high'] = swing_high_values.fillna(method='ffill')
-        signals['last_swing_low'] = swing_low_values.fillna(method='ffill')
+        signals['last_swing_high'] = swing_high_values.ffill()
+        signals['last_swing_low'] = swing_low_values.ffill()
         
-        # Entry signals
-        signals['long_entry'] = (
-            signals['is_R1'] &
-            (signals['zscore'] <= -self.params['z_threshold']) &
-            signals['bullish_wave'] &
-            (signals['bars_since_swing_low'] <= 2)
-        )
-        
-        signals['short_entry'] = (
-            signals['is_R1'] &
-            (signals['zscore'] >= self.params['z_threshold']) &
-            signals['bearish_wave'] &
-            (signals['bars_since_swing_high'] <= 2)
-        )
+        # Entry signals - Wave filter conditionally applied
+        if self.params.get('use_wave_filter', True):
+            # INVERTED wave logic for mean reversion
+            # LONG when oversold in BEARISH wave (catch bottom in downtrend)
+            # SHORT when overbought in BULLISH wave (catch top in uptrend)
+            signals['long_entry'] = (
+                signals['is_R1'] &
+                (signals['zscore'] <= -self.params['z_threshold']) &
+                signals['bearish_wave'] &
+                (signals['bars_since_swing_low'] <= self.params['swing_proximity'])
+            )
+            
+            signals['short_entry'] = (
+                signals['is_R1'] &
+                (signals['zscore'] >= self.params['z_threshold']) &
+                signals['bullish_wave'] &
+                (signals['bars_since_swing_high'] <= self.params['swing_proximity'])
+            )
+        else:
+            # NO wave filter - just Z + R1 + swing proximity
+            signals['long_entry'] = (
+                signals['is_R1'] &
+                (signals['zscore'] <= -self.params['z_threshold']) &
+                (signals['bars_since_swing_low'] <= self.params['swing_proximity'])
+            )
+            
+            signals['short_entry'] = (
+                signals['is_R1'] &
+                (signals['zscore'] >= self.params['z_threshold']) &
+                (signals['bars_since_swing_high'] <= self.params['swing_proximity'])
+            )
         
         return signals
     
@@ -287,12 +337,20 @@ class FRRStrategy:
         self.reset_state()
         
         # Iterate through bars
+        current_date = None
         for i in range(len(signals)):
             if i == 0:
                 continue
             
             current_bar = signals.iloc[i]
             prev_bar = signals.iloc[i - 1]
+            
+            # Reset daily P&L and consecutive losses at start of new trading day
+            bar_date = current_bar.name.date()
+            if current_date != bar_date:
+                current_date = bar_date
+                self.daily_pnl = 0  # Reset for new day
+                self.consecutive_losses = 0  # Reset for new day
             
             # Circuit breaker check
             if self.daily_pnl <= self.params['daily_loss_limit']:
@@ -355,7 +413,7 @@ class FRRStrategy:
             # Entry logic (if not in position)
             else:
                 # LONG entry
-                if prev_bar['long_entry']:
+                if bool(prev_bar['long_entry']):  # Explicit bool() cast
                     self._enter_trade(
                         direction='LONG',
                         entry_bar=i,
@@ -365,7 +423,7 @@ class FRRStrategy:
                     )
                 
                 # SHORT entry
-                elif prev_bar['short_entry']:
+                elif bool(prev_bar['short_entry']):  # Explicit bool() cast
                     self._enter_trade(
                         direction='SHORT',
                         entry_bar=i,
@@ -511,6 +569,8 @@ class FRRStrategy:
         long_wr = len(long_trades[long_trades['pnl'] > 0]) / len(long_trades) * 100 if len(long_trades) > 0 else 0
         short_wr = len(short_trades[short_trades['pnl'] > 0]) / len(short_trades) * 100 if len(short_trades) > 0 else 0
         
+        avg_bars_held = trades_df['bars_held'].mean() if len(trades_df) > 0 else 0
+        
         return {
             'total_trades': total_trades,
             'win_rate': win_rate,
@@ -525,7 +585,7 @@ class FRRStrategy:
             'short_trades': len(short_trades),
             'long_win_rate': long_wr,
             'short_win_rate': short_wr,
-            'avg_bars_held': trades_df['bars_held'].mean(),
+            'avg_bars_held': avg_bars_held,
             'trades': self.trades,
             'trades_df': trades_df,
         }
