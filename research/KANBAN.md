@@ -7,25 +7,25 @@
 
 ## 📋 TODO
 
-### Phase 1: Strategy Design
-- [ ] Design Fractal Regime Reversion strategy specification
-- [ ] Define entry/exit rules precisely
-- [ ] Specify parameter ranges (≤10 parameters max)
-- [ ] Document theoretical justification for each component
-- [ ] Create strategy pseudocode
-
-### Phase 1: Validation Infrastructure
+### Phase 2: Implementation & Backtesting
+- [ ] Implement backtesting engine (event-driven, slippage, commissions)
+- [ ] Implement FRR strategy in Python
 - [ ] Set up Alphalens for IC analysis
-- [ ] Design walk-forward analysis framework
-- [ ] Implement train/test/validate splits (60/20/20)
+- [ ] Implement walk-forward analysis framework
 - [ ] Build circuit breaker module
-- [ ] Create NinjaTrader Strategy Analyzer export format
+- [ ] Run Stage 1: Signal Quality (Alphalens IC validation)
+- [ ] Run Stage 2: Backtest Train Set (100+ trades, PF ≥ 1.5)
+- [ ] Run Stage 3: Walk-Forward Analysis (4 periods, OOS ≥ 80%)
+- [ ] Run Stage 4: Test Set Validation
+- [ ] Run Stage 5: Validate Set (recent data)
+- [ ] Run Stage 6: Sensitivity Analysis (±20% parameters)
+- [ ] Run Stage 7: NinjaTrader Strategy Analyzer
 
 ---
 
 ## 🔄 IN PROGRESS
 
-- **V5 Constitution Review** - Approved by user, committed to git (f9085b9)
+- **Phase 1 Complete** - Awaiting user approval to proceed to Phase 2
 
 ---
 
