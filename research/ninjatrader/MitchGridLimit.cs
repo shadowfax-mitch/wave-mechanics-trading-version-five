@@ -78,8 +78,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int consecutiveLosses;
         private DateTime lastDate;
 
-        // ── Grid cells (8 stable ultra cells) ──
-        private HashSet<string> stableCells;
+        // ── Grid cells ──
+        private HashSet<string> activeCells;
+        private bool gridFilterEnabled;
+        private bool useUltraMode;  // true = 4-axis (ultra), false = 3-axis (fine)
 
         #endregion
 
@@ -117,6 +119,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 MaxHoldBars      = 90;
                 DailyLossLimit   = -200;
                 MaxConsecLosses  = 3;
+                GridFilterMode   = 0;  // 0=None, 1=Fine(6), 2=Fine(10), 3=Ultra(8)
             }
             else if (State == State.Configure)
             {
@@ -147,18 +150,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 dailyPnl = 0;
                 consecutiveLosses = 0;
 
-                // 8 stable ultra cells (split-half validated on MNQ 2019-2026)
-                stableCells = new HashSet<string>
-                {
-                    "ema<-2|open|SHORT|high_vol",
-                    "ema<-2|morning|SHORT|high_vol",
-                    "ema-2..-1|afternoon|SHORT|norm_vol",
-                    "ema-1..0|morning|SHORT|norm_vol",
-                    "ema0..1|morning|LONG|norm_vol",
-                    "ema0..1|afternoon|LONG|norm_vol",
-                    "ema>2|open|LONG|high_vol",
-                    "ema>2|afternoon|LONG|low_vol",
-                };
+                // Grid filter setup based on GridFilterMode
+                InitializeGridFilter();
             }
         }
 
@@ -238,11 +231,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (barSignalDir == 0)
                 return;
 
-            // ── 11. Grid filter (Ultra mode) ──
-            double atrRoll50Val = ComputeAtrRoll50();
-            string cell = ClassifyUltraCell(barSignalDir, timeF, atrVal, atrRoll50Val);
-            if (cell == null || !stableCells.Contains(cell))
-                return;
+            // ── 11. Grid filter ──
+            if (gridFilterEnabled)
+            {
+                double atrRoll50Val = ComputeAtrRoll50();
+                string cell = ClassifyGridCell(barSignalDir, timeF, atrVal, atrRoll50Val);
+                if (cell == null || !activeCells.Contains(cell))
+                    return;
+            }
 
             // ── 12. Cancel existing pending order ──
             if (entryOrder != null
@@ -491,12 +487,86 @@ namespace NinjaTrader.NinjaScript.Strategies
         #region Grid Classification
 
         /// <summary>
-        /// Classify current conditions into an ultra grid cell key.
-        /// Dimensions: EMA distance bucket | time-of-day | direction | volatility regime.
+        /// Initialize grid cell sets based on GridFilterMode parameter.
+        /// Mode 0: No filter (all signals pass)
+        /// Mode 1: Fine — 6 stable cells (3-axis: EMA|TOD|direction)
+        /// Mode 2: Fine — 10 profitable cells (3-axis, not split-validated)
+        /// Mode 3: Ultra — 8 stable cells (4-axis: EMA|TOD|direction|vol)
+        /// </summary>
+        private void InitializeGridFilter()
+        {
+            activeCells = new HashSet<string>();
+
+            switch (GridFilterMode)
+            {
+                case 0: // No grid filter
+                    gridFilterEnabled = false;
+                    useUltraMode = false;
+                    break;
+
+                case 1: // Fine — 6 stable cells (split-half validated)
+                    gridFilterEnabled = true;
+                    useUltraMode = false;
+                    activeCells = new HashSet<string>
+                    {
+                        "ema<-2|open|SHORT",
+                        "ema<-2|afternoon|SHORT",
+                        "ema<-2|morning|SHORT",
+                        "ema-2..-1|afternoon|SHORT",
+                        "ema>2|open|LONG",
+                        "ema>2|morning|LONG",
+                    };
+                    break;
+
+                case 2: // Fine — 10 profitable cells (full-sample, use with caution)
+                    gridFilterEnabled = true;
+                    useUltraMode = false;
+                    activeCells = new HashSet<string>
+                    {
+                        "ema<-2|open|SHORT",
+                        "ema<-2|afternoon|SHORT",
+                        "ema<-2|morning|SHORT",
+                        "ema-2..-1|afternoon|SHORT",
+                        "ema-2..-1|morning|SHORT",
+                        "ema0..1|morning|SHORT",
+                        "ema1..2|afternoon|LONG",
+                        "ema>2|open|LONG",
+                        "ema>2|afternoon|LONG",
+                        "ema>2|morning|LONG",
+                    };
+                    break;
+
+                case 3: // Ultra — 8 stable cells (split-half validated)
+                    gridFilterEnabled = true;
+                    useUltraMode = true;
+                    activeCells = new HashSet<string>
+                    {
+                        "ema<-2|open|SHORT|high_vol",
+                        "ema<-2|morning|SHORT|high_vol",
+                        "ema-2..-1|afternoon|SHORT|norm_vol",
+                        "ema-1..0|morning|SHORT|norm_vol",
+                        "ema0..1|morning|LONG|norm_vol",
+                        "ema0..1|afternoon|LONG|norm_vol",
+                        "ema>2|open|LONG|high_vol",
+                        "ema>2|afternoon|LONG|low_vol",
+                    };
+                    break;
+
+                default: // Invalid → treat as no filter
+                    gridFilterEnabled = false;
+                    useUltraMode = false;
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Classify current conditions into a grid cell key.
+        /// Fine mode: EMA bucket | time-of-day | direction (3-axis)
+        /// Ultra mode: EMA bucket | time-of-day | direction | volatility regime (4-axis)
         /// Returns null if any dimension is unclassifiable.
         /// </summary>
-        private string ClassifyUltraCell(int direction, double timeF,
-                                          double atrVal, double atrRoll50Val)
+        private string ClassifyGridCell(int direction, double timeF,
+                                         double atrVal, double atrRoll50Val)
         {
             // EMA distance in ATR units
             double emaVal = emaIndicator[0];
@@ -523,7 +593,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Direction
             string dir = direction == 1 ? "LONG" : "SHORT";
 
-            // Volatility regime
+            if (!useUltraMode)
+                return emaBucket + "|" + tod + "|" + dir;
+
+            // Ultra: add volatility regime
             if (double.IsNaN(atrRoll50Val) || atrRoll50Val <= 0)
                 return null;
             double volRatio = atrVal / atrRoll50Val;
@@ -675,6 +748,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Limit Order Timeout", Description = "Bars before limit order expires",
             Order = 3, GroupName = "1. Entry")]
         public int LimitOrderTimeout { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0, 3)]
+        [Display(Name = "Grid Filter Mode",
+            Description = "0=None (all signals), 1=Fine 6 cells, 2=Fine 10 cells, 3=Ultra 8 cells",
+            Order = 4, GroupName = "1. Entry")]
+        public int GridFilterMode { get; set; }
 
         [NinjaScriptProperty]
         [Range(1, int.MaxValue)]
