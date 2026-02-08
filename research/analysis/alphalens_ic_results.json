@@ -1,0 +1,111 @@
+{
+  "method_1_continuous_ic": {
+    "1_bar": {
+      "ic": 0.016107262064751004,
+      "p_value": 2.169352504626498e-28
+    },
+    "5_bar": {
+      "ic": 0.010077253141444606,
+      "p_value": 4.726014083578552e-12
+    },
+    "10_bar": {
+      "ic": 0.007453348810748175,
+      "p_value": 3.164710218628402e-07
+    },
+    "20_bar": {
+      "ic": 0.0013876604820763992,
+      "p_value": 0.34110171389944005
+    }
+  },
+  "method_2_entry_signal_ic": {
+    "1_bar": {
+      "ic": 0.6720087980939075,
+      "p_value": 4.441754164365898e-75
+    },
+    "5_bar": {
+      "ic": 0.4574326742542583,
+      "p_value": 2.0713364141548772e-30
+    },
+    "10_bar": {
+      "ic": 0.3600084173479402,
+      "p_value": 1.2210578368885311e-18
+    },
+    "20_bar": {
+      "ic": 0.24919946338883142,
+      "p_value": 2.1081893869009144e-09
+    }
+  },
+  "method_3_consistency": {
+    "1_bar": {
+      "mean_ic": 0.017848950347384044,
+      "std_ic": 0.015669348776127873,
+      "positive_months_pct": 88.88888888888889,
+      "total_months": 81
+    },
+    "5_bar": {
+      "mean_ic": 0.013470250271361492,
+      "std_ic": 0.02467784566305791,
+      "positive_months_pct": 71.60493827160494,
+      "total_months": 81
+    },
+    "10_bar": {
+      "mean_ic": 0.012350690420741673,
+      "std_ic": 0.03247521540332597,
+      "positive_months_pct": 65.4320987654321,
+      "total_months": 81
+    },
+    "20_bar": {
+      "mean_ic": 0.008074276240813801,
+      "std_ic": 0.04472879952321329,
+      "positive_months_pct": 59.25925925925925,
+      "total_months": 81
+    }
+  },
+  "method_4_directional_accuracy": {
+    "1_bar": {
+      "overall_accuracy": 82.91814946619218,
+      "long_accuracy": 85.03649635036497,
+      "long_count": 274,
+      "short_accuracy": 80.90277777777779,
+      "short_count": 288,
+      "long_mean_return_pct": 0.08408480742928164,
+      "short_mean_return_pct": -0.043481876272760754
+    },
+    "5_bar": {
+      "overall_accuracy": 72.41992882562278,
+      "long_accuracy": 74.08759124087592,
+      "long_count": 274,
+      "short_accuracy": 70.83333333333334,
+      "short_count": 288,
+      "long_mean_return_pct": 0.08821398859392984,
+      "short_mean_return_pct": -0.056946875201332785
+    },
+    "10_bar": {
+      "overall_accuracy": 67.97153024911033,
+      "long_accuracy": 70.07299270072993,
+      "long_count": 274,
+      "short_accuracy": 65.97222222222221,
+      "short_count": 288,
+      "long_mean_return_pct": 0.10596305463946387,
+      "short_mean_return_pct": -0.053843861179490284
+    },
+    "20_bar": {
+      "overall_accuracy": 62.27758007117438,
+      "long_accuracy": 63.138686131386855,
+      "long_count": 274,
+      "short_accuracy": 61.458333333333336,
+      "short_count": 288,
+      "long_mean_return_pct": 0.12108021677922727,
+      "short_mean_return_pct": -0.05229411513997463
+    }
+  },
+  "acceptance": {
+    "ic_threshold": 0.05,
+    "best_ic": 0.6720087980939075,
+    "ic_pass": "True",
+    "consistency_threshold": 50.0,
+    "best_consistency": 88.88888888888889,
+    "consistency_pass": true,
+    "stage_1_pass": true
+  }
+}

@@ -8,7 +8,6 @@
 ## 📋 TODO
 
 ### Phase 2: Remaining
-- [ ] Run Stage 1: Signal Quality (Alphalens IC validation)
 - [ ] Run Stage 7: NinjaTrader Strategy Analyzer (C# implementation)
 
 ### Phase 3: Forward Testing
@@ -40,6 +39,7 @@
 - [x] Run Stage 5: Validate Set (recent) — 32 trades, 68.8% WR, 3.80 PF, +$360, Sharpe 5.74
 - [x] Run Stage 3: Walk-Forward Analysis — **4/4 OOS windows profitable** (PF 1.88–4.85)
 - [x] Run Stage 6: Sensitivity Analysis — **6/8 params rock-solid**, 2 flagged only at -40% extreme, all stable at +-20%
+- [x] Run Stage 1: Alphalens IC Analysis — **IC=0.672 (1-bar)**, 82.9% directional accuracy, 88.9% monthly consistency
 
 ### Phase 1: Strategy Design (Feb 6-7)
 - [x] Created research infrastructure (`research/` folder structure)
@@ -88,7 +88,7 @@
 
 | Stage | Status | Result |
 |-------|--------|--------|
-| Stage 1: Signal Quality (Alphalens) | TODO | — |
+| Stage 1: Signal Quality (Alphalens) | PASS | IC=0.672, 88.9% consistency |
 | Stage 2: Backtest Train | PASS | 395 trades, 56.7% WR, 2.89 PF |
 | Stage 3: Walk-Forward | PASS | 4/4 OOS windows profitable |
 | Stage 4: Test Set (OOS) | PASS | 120 trades, 64.2% WR, 4.35 PF |
@@ -107,7 +107,7 @@
 | Sharpe Ratio | 5.24 | > 0 | PASS |
 | Max Drawdown | $210 | <= 3x AvgWin ($70) | FAIL |
 
-**Next Milestone:** Alphalens IC analysis or NinjaTrader C# port
+**Next Milestone:** NinjaTrader C# port (Stage 7 — final validation stage)
 
 ---
 
