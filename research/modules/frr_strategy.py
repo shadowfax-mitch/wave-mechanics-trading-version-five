@@ -192,12 +192,15 @@ class FRRStrategy:
             bullish_wave: Boolean series (higher swing lows trend)
             bearish_wave: Boolean series (lower swing highs trend)
         """
-        swing_highs = self.detect_swing_highs(df, self.params['swing_strength'])
-        swing_lows = self.detect_swing_lows(df, self.params['swing_strength'])
-        
+        strength = self.params['swing_strength']
+        # Apply same look-ahead bias fix: shift swings forward by strength bars
+        swing_highs = self.detect_swing_highs(df, strength).shift(strength).fillna(False)
+        swing_lows = self.detect_swing_lows(df, strength).shift(strength).fillna(False)
+
         # Get just the swing point values (NaN elsewhere)
-        swing_high_values = df['high'].where(swing_highs)
-        swing_low_values = df['low'].where(swing_lows)
+        # Use shifted index but original price from strength bars ago
+        swing_high_values = df['high'].shift(strength).where(swing_highs)
+        swing_low_values = df['low'].shift(strength).where(swing_lows)
         
         # Identify when swing levels CHANGE (new swing point detected)
         # Compare each swing to the previous swing
@@ -263,12 +266,16 @@ class FRRStrategy:
             signals, self.params['ema_period']
         )
         
+        strength = self.params['swing_strength']
+        # Shift swings forward by 'strength' bars to remove look-ahead bias.
+        # In real-time, a fractal swing at bar i is only confirmed at bar i+strength
+        # (you need 'strength' future bars to verify it's a local extremum).
         signals['swing_high'] = self.detect_swing_highs(
-            signals, self.params['swing_strength']
-        )
+            signals, strength
+        ).shift(strength).fillna(False)
         signals['swing_low'] = self.detect_swing_lows(
-            signals, self.params['swing_strength']
-        )
+            signals, strength
+        ).shift(strength).fillna(False)
         
         signals['bullish_wave'], signals['bearish_wave'] = self.calculate_wave_direction(
             signals
@@ -282,8 +289,9 @@ class FRRStrategy:
         )
         
         # Get most recent swing levels for stops
-        swing_high_values = signals['high'].where(signals['swing_high'])
-        swing_low_values = signals['low'].where(signals['swing_low'])
+        # Swing booleans are shifted forward, so the actual price is 'strength' bars back
+        swing_high_values = signals['high'].shift(strength).where(signals['swing_high'])
+        swing_low_values = signals['low'].shift(strength).where(signals['swing_low'])
         
         signals['last_swing_high'] = swing_high_values.ffill()
         signals['last_swing_low'] = swing_low_values.ffill()
@@ -389,8 +397,8 @@ class FRRStrategy:
                     exit_signal = 'TIME'
                     exit_price = current_bar['close']
 
-                # Regime exit
-                if exit_signal is None and not current_bar['is_R1']:
+                # Regime exit (only when regime filter is active)
+                if exit_signal is None and self.params.get('use_regime_filter', True) and not current_bar['is_R1']:
                     exit_signal = 'REGIME'
                     exit_price = current_bar['close']
 

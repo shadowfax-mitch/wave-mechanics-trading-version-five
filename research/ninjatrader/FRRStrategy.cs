@@ -276,7 +276,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (z > -ZThreshold)
                 return false;
 
-            // Swing proximity
+            // Swing proximity (barsSinceSwing starts at 0 on confirmation bar)
             if (barsSinceSwingLow > SwingProximity + barsAgo)
                 return false;
 
@@ -301,7 +301,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (z < ZThreshold)
                 return false;
 
-            // Swing proximity
+            // Swing proximity (barsSinceSwing starts at 0 on confirmation bar)
             if (barsSinceSwingHigh > SwingProximity + barsAgo)
                 return false;
 
@@ -378,9 +378,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 lastSwingHighValue = newHigh;
                 lastSwingHighValid = true;
 
-                // Update stop level and bars-since (offset by confirmation delay)
+                // Update stop level and bars-since
                 lastSwingHighLevel = newHigh;
-                barsSinceSwingHigh = s;  // It was s bars ago
+                barsSinceSwingHigh = 0;  // Just confirmed — proximity starts now
                 firstSwingHighSeen = true;
             }
 
@@ -406,9 +406,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 lastSwingLowValue = newLow;
                 lastSwingLowValid = true;
 
-                // Update stop level and bars-since (offset by confirmation delay)
+                // Update stop level and bars-since
                 lastSwingLowLevel = newLow;
-                barsSinceSwingLow = s;  // It was s bars ago
+                barsSinceSwingLow = 0;  // Just confirmed — proximity starts now
                 firstSwingLowSeen = true;
             }
         }
