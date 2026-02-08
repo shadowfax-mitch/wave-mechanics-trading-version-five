@@ -1,16 +1,14 @@
 # V5 KANBAN - Task Tracking Board
 
-**Last updated:** 2026-02-07 17:30 CT
-**Current Phase:** Phase 2 - Implementation & Backtesting (nearing completion)
+**Last updated:** 2026-02-07 18:15 CT
+**Current Phase:** Phase 2 COMPLETE — Ready for Phase 3 (Forward Testing)
 
 ---
 
 ## 📋 TODO
 
-### Phase 2: Remaining
-- [ ] Run Stage 7: NinjaTrader Strategy Analyzer (C# implementation)
-
 ### Phase 3: Forward Testing
+- [ ] Run Stage 7: NinjaTrader Strategy Analyzer (validate C# matches Python within 5%)
 - [ ] Market Replay testing (2+ weeks, tick-perfect simulation)
 - [ ] Paper trading setup & execution (2+ weeks)
 - [ ] Micro-live deployment (1 contract, circuit breakers active, 2+ weeks)
@@ -40,6 +38,7 @@
 - [x] Run Stage 3: Walk-Forward Analysis — **4/4 OOS windows profitable** (PF 1.88–4.85)
 - [x] Run Stage 6: Sensitivity Analysis — **6/8 params rock-solid**, 2 flagged only at -40% extreme, all stable at +-20%
 - [x] Run Stage 1: Alphalens IC Analysis — **IC=0.672 (1-bar)**, 82.9% directional accuracy, 88.9% monthly consistency
+- [x] Write Stage 7: NinjaTrader C# port — 589 lines, `ninjatrader/FRRStrategy.cs`, all logic matched to Python
 
 ### Phase 1: Strategy Design (Feb 6-7)
 - [x] Created research infrastructure (`research/` folder structure)
@@ -65,7 +64,7 @@
 ## 📦 BACKLOG
 
 ### Phase 3: Forward Testing (Weeks 3-4)
-- [ ] NinjaTrader Strategy Analyzer validation (C# port)
+- [ ] NinjaTrader Strategy Analyzer validation (run C# port, compare to Python)
 - [ ] Market Replay testing (2+ weeks)
 - [ ] Paper trading setup
 - [ ] Paper trading execution (2+ weeks)
@@ -94,7 +93,7 @@
 | Stage 4: Test Set (OOS) | PASS | 120 trades, 64.2% WR, 4.35 PF |
 | Stage 5: Validate Set | PASS | 32 trades, 68.8% WR, 3.80 PF |
 | Stage 6: Sensitivity | PASS | 6/8 stable, 0 fragile at +-20% |
-| Stage 7: NinjaTrader | TODO | — |
+| Stage 7: NinjaTrader | C# WRITTEN | Awaiting Strategy Analyzer run |
 
 **Acceptance Criteria (Full Dataset):**
 
@@ -107,7 +106,7 @@
 | Sharpe Ratio | 5.24 | > 0 | PASS |
 | Max Drawdown | $210 | <= 3x AvgWin ($70) | FAIL |
 
-**Next Milestone:** NinjaTrader C# port (Stage 7 — final validation stage)
+**Next Milestone:** Run NinjaTrader Strategy Analyzer (Stage 7 — validate C# matches Python within 5%)
 
 ---
 
