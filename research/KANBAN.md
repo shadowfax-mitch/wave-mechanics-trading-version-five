@@ -1,44 +1,41 @@
 # V5 KANBAN - Task Tracking Board
 
-**Last updated:** 2026-02-07 18:15 CT
-**Current Phase:** Phase 2 COMPLETE — Ready for Phase 3 (Forward Testing)
+**Last updated:** 2026-02-07 19:00 CT
+**Current Phase:** Back to Drawing Board — FRR strategy invalidated
 
 ---
 
 ## 📋 TODO
 
-### Phase 3: Forward Testing
-- [ ] Run Stage 7: NinjaTrader Strategy Analyzer (validate C# matches Python within 5%)
-- [ ] Market Replay testing (2+ weeks, tick-perfect simulation)
-- [ ] Paper trading setup & execution (2+ weeks)
-- [ ] Micro-live deployment (1 contract, circuit breakers active, 2+ weeks)
+### Next: Strategy Research
+- [ ] Study more systems from the ~284 available
+- [ ] Identify candidates with real (non-look-ahead) edge
+- [ ] Build validation pipeline that prevents look-ahead bias from the start
 
 ---
 
 ## 🔄 IN PROGRESS
 
-- None — awaiting next phase decision
+- None — regrouping after FRR invalidation
 
 ---
 
 ## ✅ DONE
 
-### Phase 2: Implementation & Backtesting (Feb 7)
+### FRR Strategy (V5) — INVALIDATED (Feb 7)
 - [x] Implement FRR strategy in Python (591 lines, `frr_strategy.py`)
 - [x] Implement backtesting engine (event-driven, slippage $2, commission $1)
 - [x] Build circuit breaker module (daily P&L + consecutive loss limits)
-- [x] **Bug Audit #1:** Fixed 15 bugs (circuit breaker blocking exits, stop-loss price bias, MES API mismatch, stale params, etc.) — see `BUG_AUDIT_REPORT.md`
-- [x] Discovered previous +$17K results were inflated by bugs; corrected backtest showed aggressive params (z=3.0) had no edge (-$15K)
-- [x] **R1 regime dropped:** Fired 0.06% of bars, killed 98.8% of Z-extreme signals
-- [x] **Grid search:** Tested Z-threshold x swing_proximity matrix, identified Z=3.5/prox=2 as optimal
-- [x] **Locked-in config:** Z=3.5, swing_proximity=2, no R1, wave filter ON
-- [x] Run Stage 2: Backtest Full Dataset — 547 trades, 59.0% WR, 3.27 PF, +$3,590, Sharpe 5.24
-- [x] Run Stage 4: Test Set (OOS) — 120 trades, 64.2% WR, 4.35 PF, +$1,108, Sharpe 7.54
-- [x] Run Stage 5: Validate Set (recent) — 32 trades, 68.8% WR, 3.80 PF, +$360, Sharpe 5.74
-- [x] Run Stage 3: Walk-Forward Analysis — **4/4 OOS windows profitable** (PF 1.88–4.85)
-- [x] Run Stage 6: Sensitivity Analysis — **6/8 params rock-solid**, 2 flagged only at -40% extreme, all stable at +-20%
-- [x] Run Stage 1: Alphalens IC Analysis — **IC=0.672 (1-bar)**, 82.9% directional accuracy, 88.9% monthly consistency
-- [x] Write Stage 7: NinjaTrader C# port — 589 lines, `ninjatrader/FRRStrategy.cs`, all logic matched to Python
+- [x] **Bug Audit #1:** Fixed 15 bugs — see `BUG_AUDIT_REPORT.md`
+- [x] Discovered +$17K results were inflated by bugs; corrected to -$15K
+- [x] R1 regime dropped (fired 0.06% of bars)
+- [x] Grid search → locked in Z=3.5, prox=2, no R1, wave filter ON
+- [x] Ran all 7 validation stages (all appeared to PASS)
+- [x] NinjaTrader C# port written (589 lines)
+- [x] **Stage 7 FAIL:** NinjaTrader Strategy Analyzer showed ~0.9 trades/mo, +$34 (vs Python's 547 trades, +$3,590)
+- [x] **Root cause: look-ahead bias in swing detection** — Python used `shift(-i)` to peek at future bars for fractal confirmation. Fixed with `.shift(strength)` delay.
+- [x] **Corrected Python backtest: 216 trades, 0.52 PF, -$1,942** — no edge exists
+- [x] Also fixed regime exit gate (was forcing 1-bar exits when R1 disabled)
 
 ### Phase 1: Strategy Design (Feb 6-7)
 - [x] Created research infrastructure (`research/` folder structure)
@@ -51,7 +48,6 @@
 - [x] Staged MNQ + MES datasets (2019-2026, 6.7 years, 470K+ bars each)
 - [x] Created V5 Constitution with founding principles
 - [x] V5 Strategy Spec (FRR) + Validation Protocol (7 stages)
-- [x] User approval + git commit (f9085b9)
 
 ---
 
@@ -63,56 +59,37 @@
 
 ## 📦 BACKLOG
 
-### Phase 3: Forward Testing (Weeks 3-4)
-- [ ] NinjaTrader Strategy Analyzer validation (run C# port, compare to Python)
-- [ ] Market Replay testing (2+ weeks)
-- [ ] Paper trading setup
-- [ ] Paper trading execution (2+ weeks)
-- [ ] Micro-live setup (1 contract + circuit breakers)
-- [ ] Micro-live execution (2+ weeks)
-
-### Phase 4: Production (If validated)
-- [ ] Scale to 2-3 contracts
-- [ ] Monitor performance vs backtest
-- [ ] Weekly performance reviews
-- [ ] Monthly regime assessment
+### Infrastructure (reusable)
+- Backtesting engine with slippage/commission modeling
+- Circuit breaker module
+- 7-stage validation pipeline
+- NinjaTrader C# porting workflow
+- MNQ + MES 5-min datasets (2019-2026)
 
 ---
 
 ## 📊 PROGRESS METRICS
 
 **Systems Studied:** 4 / ~284
-**Current Strategy:** FRR (Z=3.5, prox=2, no R1, wave filter ON)
-**Validation Status:**
+**Current Strategy:** None — FRR invalidated
+**FRR Final Validation (corrected):**
 
 | Stage | Status | Result |
 |-------|--------|--------|
-| Stage 1: Signal Quality (Alphalens) | PASS | IC=0.672, 88.9% consistency |
-| Stage 2: Backtest Train | PASS | 395 trades, 56.7% WR, 2.89 PF |
-| Stage 3: Walk-Forward | PASS | 4/4 OOS windows profitable |
-| Stage 4: Test Set (OOS) | PASS | 120 trades, 64.2% WR, 4.35 PF |
-| Stage 5: Validate Set | PASS | 32 trades, 68.8% WR, 3.80 PF |
-| Stage 6: Sensitivity | PASS | 6/8 stable, 0 fragile at +-20% |
-| Stage 7: NinjaTrader | C# WRITTEN | Awaiting Strategy Analyzer run |
-
-**Acceptance Criteria (Full Dataset):**
-
-| Criterion | Value | Target | Status |
-|-----------|-------|--------|--------|
-| Total Trades | 547 | 100+ | PASS |
-| Win Rate | 59.0% | 55%+ | PASS |
-| Profit Factor | 3.27 | 1.5+ | PASS |
-| Avg W/L Ratio | 2.22 | 1.2+ | PASS |
-| Sharpe Ratio | 5.24 | > 0 | PASS |
-| Max Drawdown | $210 | <= 3x AvgWin ($70) | FAIL |
-
-**Next Milestone:** Run NinjaTrader Strategy Analyzer (Stage 7 — validate C# matches Python within 5%)
+| Stage 1: Alphalens IC | INVALID | Built on look-ahead biased signals |
+| Stage 2: Backtest Train | FAIL | 216 trades, ~35% WR, 0.52 PF, -$1,942 |
+| Stage 3: Walk-Forward | INVALID | Built on look-ahead biased signals |
+| Stage 4: Test Set (OOS) | INVALID | Built on look-ahead biased signals |
+| Stage 5: Validate Set | INVALID | Built on look-ahead biased signals |
+| Stage 6: Sensitivity | INVALID | Built on look-ahead biased signals |
+| Stage 7: NinjaTrader | FAIL | ~0.9 trades/mo, +$34 (break-even) |
 
 ---
 
-**Notes:**
-- ONE strategy only (V5 Constitution constraint)
-- R1 regime removed — too restrictive for 5-min bars (0.06% activation)
-- Edge confirmed: improves OOS (train 56.7% WR → test 64.2% WR → validate 68.8% WR)
-- Only failing criterion is max drawdown ($210 vs $70 threshold)
-- Previous "breakthrough" results (+$17K, 2.03 PF) were artifacts of 2 bugs
+## 📝 LESSONS LEARNED
+
+1. **Always test for look-ahead bias FIRST** — any indicator using future data (`shift(-n)`, forward-looking windows) must account for confirmation delay before backtesting
+2. **NinjaTrader is the truth** — it can't cheat because it processes bar-by-bar in real time. Always cross-validate Python results against NT before trusting them.
+3. **Fractal swing detection inherently has confirmation lag** — `strength` bars must pass before a swing is confirmed. Python vectorized code hides this with `shift(-i)`.
+4. **Validation stages are only as honest as the signal generation** — all 6 Python stages "passed" because they all used the same biased input.
+5. **Regime exit must be gated** — when `use_regime_filter=False`, the regime exit was still active, forcing 1-bar holding periods.
