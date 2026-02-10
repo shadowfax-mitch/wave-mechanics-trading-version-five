@@ -83,6 +83,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool gridFilterEnabled;
         private bool useUltraMode;  // true = 4-axis (ultra), false = 3-axis (fine)
 
+        // ── Signal bar filter stats (debug) ──
+        private int signalBarPassed;
+        private int signalBarFailed;
+
         #endregion
 
         #region OnStateChange
@@ -120,6 +124,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 DailyLossLimit   = -200;
                 MaxConsecLosses  = 3;
                 GridFilterMode   = 0;  // 0=None, 1=Fine(6), 2=Fine(10), 3=Ultra(8)
+                UseSignalBarFilter = true;
+                SignalBarClosePct  = 0.40;
+                SignalBarBodyPct   = 0.15;
             }
             else if (State == State.Configure)
             {
@@ -152,6 +159,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // Grid filter setup based on GridFilterMode
                 InitializeGridFilter();
+
+                // Signal bar filter stats
+                signalBarPassed = 0;
+                signalBarFailed = 0;
             }
         }
 
@@ -240,7 +251,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return;
             }
 
-            // ── 12. Cancel existing pending order ──
+            // ── 12. Signal bar quality filter ──
+            if (UseSignalBarFilter)
+            {
+                if (!CheckSignalBar(barSignalDir, atrVal))
+                {
+                    signalBarFailed++;
+                    return;
+                }
+                signalBarPassed++;
+            }
+
+            // ── 13. Cancel existing pending order ──
             if (entryOrder != null
                 && (entryOrder.OrderState == OrderState.Working
                     || entryOrder.OrderState == OrderState.Accepted))
@@ -249,7 +271,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 entryOrder = null;
             }
 
-            // ── 13. Place limit order at swing price ──
+            // ── 14. Place limit order at swing price ──
             pendingStopPrice = barSignalStop;
 
             if (barSignalDir == 1)
@@ -611,6 +633,58 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         #endregion
 
+        #region Signal Bar Filter
+
+        /// <summary>
+        /// Check if the current bar qualifies as a good signal bar.
+        /// Matches Python's check_signal_bar from mitch_v2_strategy.py.
+        ///
+        /// For long signals: bar must be bullish (close > open), close in upper
+        /// portion of bar range, body must be meaningful portion of range.
+        /// For short signals: mirror logic (bearish bar, close in lower portion).
+        ///
+        /// Also rejects dojis (tiny body) and extreme bars (range > 3x ATR).
+        /// </summary>
+        private bool CheckSignalBar(int direction, double atrVal)
+        {
+            double barRange = High[0] - Low[0];
+            if (barRange <= 0)
+                return false;
+
+            // Range must be meaningful but not extreme
+            if (double.IsNaN(atrVal) || atrVal <= 0)
+                return false;
+            if (barRange < 0.15 * atrVal)  // not a doji
+                return false;
+            if (barRange > 3.0 * atrVal)   // not an outlier
+                return false;
+
+            // Body size check
+            double body = Math.Abs(Close[0] - Open[0]);
+            if (body / barRange < SignalBarBodyPct)
+                return false;
+
+            // Close position + direction check
+            if (direction == 1) // Long: bullish bar, close in upper portion
+            {
+                if (Close[0] <= Open[0])
+                    return false;
+                if ((Close[0] - Low[0]) / barRange < (1.0 - SignalBarClosePct))
+                    return false;
+            }
+            else // Short: bearish bar, close in lower portion
+            {
+                if (Close[0] >= Open[0])
+                    return false;
+                if ((High[0] - Close[0]) / barRange < (1.0 - SignalBarClosePct))
+                    return false;
+            }
+
+            return true;
+        }
+
+        #endregion
+
         #region Trailing Stop
 
         /// <summary>
@@ -802,6 +876,26 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Max Consec Losses", Description = "Circuit breaker: pause after N consecutive losses",
             Order = 2, GroupName = "3. Risk")]
         public int MaxConsecLosses { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Use Signal Bar Filter",
+            Description = "Require signal bar to show directional conviction (bullish for longs, bearish for shorts)",
+            Order = 1, GroupName = "4. Signal Bar")]
+        public bool UseSignalBarFilter { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0.0, 0.50)]
+        [Display(Name = "Signal Bar Close %",
+            Description = "Close must be in this % of bar from favorable end (0.40=top 60% for longs). Lower = stricter.",
+            Order = 2, GroupName = "4. Signal Bar")]
+        public double SignalBarClosePct { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0.0, 0.50)]
+        [Display(Name = "Signal Bar Body %",
+            Description = "Body must be at least this % of bar range (0.15=15% min body). Higher = stricter.",
+            Order = 3, GroupName = "4. Signal Bar")]
+        public double SignalBarBodyPct { get; set; }
 
         #endregion
     }

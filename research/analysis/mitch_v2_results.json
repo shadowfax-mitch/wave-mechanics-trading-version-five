@@ -1,0 +1,150 @@
+{
+  "total_trades": 5124,
+  "win_rate": 21.43,
+  "profit_factor": 0.7904,
+  "total_pnl": -22301.86,
+  "avg_pnl": -4.35,
+  "avg_win": 76.57,
+  "avg_loss": -26.42,
+  "sharpe": -0.0704,
+  "max_drawdown": 22638.97,
+  "years": 6.69,
+  "annual_pnl": -3334.32,
+  "trades_per_year": 766.1,
+  "trades_per_day": 2.83,
+  "avg_bars_held": 14.5,
+  "long_trades": 2666,
+  "short_trades": 2458,
+  "long_pnl": -9837.3,
+  "short_pnl": -12464.56,
+  "long_win_rate": 23.89,
+  "short_win_rate": 18.76,
+  "exit_reasons": {
+    "STOP": {
+      "count": 3438,
+      "pnl": -99513.75
+    },
+    "TRAIL_STOP": {
+      "count": 1608,
+      "pnl": 62075.13999999992
+    },
+    "TIME": {
+      "count": 78,
+      "pnl": 15136.75
+    }
+  },
+  "first_entry": {
+    "count": 0,
+    "win_rate": 0,
+    "avg_pnl": 0,
+    "total_pnl": 0,
+    "profit_factor": 0
+  },
+  "second_entry": {
+    "count": 0,
+    "win_rate": 0,
+    "avg_pnl": 0,
+    "total_pnl": 0,
+    "profit_factor": 0
+  },
+  "yearly": {
+    "2019": {
+      "count": 495,
+      "pnl": -2143.1,
+      "wins": 91,
+      "win_rate": 18.38
+    },
+    "2020": {
+      "count": 786,
+      "pnl": -4111.96,
+      "wins": 155,
+      "win_rate": 19.72
+    },
+    "2021": {
+      "count": 798,
+      "pnl": -2842.1,
+      "wins": 177,
+      "win_rate": 22.18
+    },
+    "2022": {
+      "count": 768,
+      "pnl": -4465.7,
+      "wins": 157,
+      "win_rate": 20.44
+    },
+    "2023": {
+      "count": 759,
+      "pnl": -2919.03,
+      "wins": 172,
+      "win_rate": 22.66
+    },
+    "2024": {
+      "count": 760,
+      "pnl": -2359.2,
+      "wins": 174,
+      "win_rate": 22.89
+    },
+    "2025": {
+      "count": 739,
+      "pnl": -3724.77,
+      "wins": 165,
+      "win_rate": 22.33
+    },
+    "2026": {
+      "count": 19,
+      "pnl": 264.0,
+      "wins": 7,
+      "win_rate": 36.84
+    }
+  },
+  "trading_days": 1812,
+  "pattern_breakdown": {
+    "FAILURE": {
+      "count": 2004,
+      "pnl": -8195.03,
+      "wins": 435,
+      "win_rate": 21.71,
+      "avg_pnl": -4.09
+    },
+    "PULLBACK": {
+      "count": 1348,
+      "pnl": -2550.2,
+      "wins": 287,
+      "win_rate": 21.29,
+      "avg_pnl": -1.89
+    },
+    "TRIPLE_TEST": {
+      "count": 1772,
+      "pnl": -11556.63,
+      "wins": 376,
+      "win_rate": 21.22,
+      "avg_pnl": -6.52
+    }
+  },
+  "trend_breakdown": {
+    "TREND_DOWN": {
+      "count": 1163,
+      "pnl": -8544.82,
+      "wins": 207,
+      "win_rate": 17.8,
+      "avg_pnl": -7.35
+    },
+    "TREND_UP": {
+      "count": 1196,
+      "pnl": -4385.05,
+      "wins": 291,
+      "win_rate": 24.33,
+      "avg_pnl": -3.67
+    },
+    "RANGE": {
+      "count": 2765,
+      "pnl": -9371.99,
+      "wins": 600,
+      "win_rate": 21.7,
+      "avg_pnl": -3.39
+    }
+  },
+  "total_signals": 5963,
+  "total_fills": 5125,
+  "fill_rate": 85.95
+}
